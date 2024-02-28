@@ -22,7 +22,7 @@ function formatDate(date) {
 
 function delay() {
   return new Promise((resolve, reject) => {
-    setTimeout(resolve, 1000);
+    setTimeout(resolve, 21);
   });
 }
 
@@ -61,38 +61,38 @@ function createQuery(data) {
 }
 
 async function populateData() {
-  return new Promise((resolve, reject) => {
-    let data = [];
+  let data = [];
+  let counter = 1;
 
-    fs.createReadStream("./data.csv")
-      .pipe(parse({ objectMode: true, headers: true }))
-      .on("error", (error) => {
-        console.error(error);
-        reject(error);
-      })
-      .on("data", (row) => {
-        data.push(createQuery(row));
-      })
-      .on("end", () => {
-        resolve(data);
-      });
-  });
+  fs.createReadStream("./data.csv")
+    .pipe(parse({ objectMode: true, headers: true }))
+    .on("error", (error) => {
+      console.error(error);
+    })
+    .on("data", async (row) => {
+      data.push(createQuery(row));
+    })
+    .on("end", async () => {
+      for (const item of data) {
+        await delay();
+        try {
+          const res = await axios.post(
+            `https://api.eu1.prepr.io/content_items`,
+            item,
+            {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.REST_TOKEN}`,
+              },
+            }
+          );
+          counter += 1;
+          console.log(item, `${counter} / ${data.length}`);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+    });
 }
 
-populateData().then((data) => {
-  const _data = data[0].items;
-  console.log(data[0].items);
-  axios
-    .post(`https://api.eu1.prepr.io/content_items`, _data, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.REST_TOKEN}`,
-      },
-    })
-    .then((response) => {
-      console.log(response.data);
-    })
-    .catch((error) => {
-      console.error(error.response.data);
-    });
-});
+populateData();
